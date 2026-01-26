@@ -70,8 +70,35 @@ def process_single_file(file_path):
     if sigma_3 <= 20 or sigma_3 >= 300:
         is_valid = 0
     
+    # --- 5分割判定 (追加処理) ---
+    # データを5分割して、それぞれの部分で3シグマ判定を行う
+    # 5/2以上 (つまり3つ以上) が無効判定なら、全体を無効とする
+    split_invalid_count = 0
+    chunks = np.array_split(values, 5)
+    
+    for i, chunk in enumerate(chunks):
+        if len(chunk) == 0:
+            # データがない場合は便宜上無効カウントとするか？
+            # ここでは分割時の端数処理等の安全策としてスキップまたは特定の扱いにするが、
+            # 通常np.array_split等分ならデータがあれば0にはなりにくい。
+            continue
+            
+        chunk_std = chunk.std()
+        chunk_sigma_3 = 3 * chunk_std
+        
+        # 判定条件はこれまでと同じ
+        if chunk_sigma_3 <= 20 or chunk_sigma_3 >= 300:
+            split_invalid_count += 1
+            
+    # 元々有効だった場合のみ、この条件で再判定を行い無効化する
+    # (元々無効だったものは無効のまま)
+    if is_valid == 1:
+        if split_invalid_count >= 3:  # 5分の2.5以上 -> 3以上
+            is_valid = 0
+            print(f"  -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
+
     id_name = get_id_from_filename(file_path)
-    print(f"Processed: {id_name} | 3Sigma: {sigma_3:.2f} | Valid: {is_valid}")
+    print(f"Processed: {id_name} | 3Sigma: {sigma_3:.2f} | Valid: {is_valid} | SplitInvalid: {split_invalid_count}/5")
 
     # --- グラフ作成 ---
     setup_plot_style()
@@ -126,7 +153,8 @@ def process_single_file(file_path):
     return {
         'ID': id_name,
         'Valid': is_valid,
-        '3Sigma': sigma_3
+        '3Sigma': sigma_3,
+        'SplitInvalidCount': split_invalid_count
     }
 
 def main():
@@ -164,10 +192,13 @@ def main():
         df_result = pd.DataFrame(all_results)
         
         # カラム順序指定
-        cols = ['ID', 'Valid', '3Sigma']
+        cols = ['ID', 'Valid', '3Sigma', 'SplitInvalidCount']
         df_result = df_result[cols]
         
-        df_result.to_csv(result_csv_path, index=False)
+        # カラム名変更
+        df_result = df_result.rename(columns={'SplitInvalidCount': '分割後無効数'})
+        
+        df_result.to_csv(result_csv_path, index=False, encoding='utf-8-sig')
         
         print("-" * 30)
         print("全処理完了！")
