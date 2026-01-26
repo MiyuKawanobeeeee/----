@@ -12,7 +12,7 @@ from tkinter import filedialog, messagebox
 # --- 設定 ---
 # フォント設定 (graph_create_v12.ipynbより)
 FONT_FAMILY = ['Yu Gothic', 'Meiryo', 'Hiragino Sans', 'TakaoPGothic', 'IPAexGothic', 'Noto Sans CJK JP']
-name='0609_1900'
+name='KA02_0609_1900_add_5saparates'
 def setup_plot_style():
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = FONT_FAMILY
@@ -73,7 +73,7 @@ def process_single_file(file_path):
     
     # --- 5分割判定 (追加処理) ---
     # データを5分割して、それぞれの部分で3シグマ判定を行う
-    # 5/2以上 (つまり3つ以上) が無効判定なら、全体を無効とする
+    # 5/2以上ではないが、2つ以上が無効判定なら、全体を無効とする (ユーザー指定)
     split_invalid_count = 0
     chunks = np.array_split(values, 5)
     
@@ -94,7 +94,7 @@ def process_single_file(file_path):
     # 元々有効だった場合のみ、この条件で再判定を行い無効化する
     # (元々無効だったものは無効のまま)
     if is_valid == 1:
-        if split_invalid_count >= 3:  # 5分の2.5以上 -> 3以上
+        if split_invalid_count >= 2:  # 2つ以上で無効
             is_valid = 0
             print(f"  -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
 
