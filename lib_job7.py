@@ -25,22 +25,35 @@ def validate_peak_data(values, min_th=20, max_th=300):
     std = values.std()
     sigma3 = 3 * std
     
+    # --- DEBUG START ---
+    print(f"  [DEBUG] Global 3Sigma: {sigma3:.2f} (Range: {min_th}-{max_th})")
+    # --- DEBUG END ---
+
     is_valid = 1
     if sigma3 <= min_th or sigma3 >= max_th:
         is_valid = 0
+        print("  [DEBUG] -> Global Invalid")
         
     split_invalid_count = 0
     chunks = np.array_split(values, 5)
-    for c in chunks:
+    for i, c in enumerate(chunks):
         if len(c) == 0: continue
         c_std = c.std()
         c_sigma = 3 * c_std
+        
+        chunk_status = "Valid"
         if c_sigma <= min_th or c_sigma >= max_th:
             split_invalid_count += 1
+            chunk_status = "Invalid"
+        
+        # --- DEBUG START ---
+        print(f"    [DEBUG] Chunk {i}: 3Sigma={c_sigma:.2f} -> {chunk_status}")
+        # --- DEBUG END ---
             
     if is_valid == 1:
         if split_invalid_count >= 2:
             is_valid = 0
+            print(f"  [DEBUG] -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
             
     return is_valid, sigma3, split_invalid_count
 
