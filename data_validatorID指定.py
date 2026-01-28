@@ -12,7 +12,7 @@ from tkinter import filedialog, messagebox
 # --- 設定 ---
 # フォント設定 (graph_create_v12.ipynbより)
 FONT_FAMILY = ['Yu Gothic', 'Meiryo', 'Hiragino Sans', 'TakaoPGothic', 'IPAexGothic', 'Noto Sans CJK JP']
-name='KA02_0609_1900_add_5saparates'
+name='NK05_check'
 def setup_plot_style():
     plt.rcParams['font.family'] = 'sans-serif'
     plt.rcParams['font.sans-serif'] = FONT_FAMILY
@@ -24,8 +24,8 @@ def get_id_from_filename(filename):
     base = os.path.basename(filename)
     name_body = os.path.splitext(base)[0]
     
-    prefix = "data_peak_pulse_marged_20250609_190000_NCSA1A23090202_"
-    suffix = "_merged"
+    prefix = "clipdata_"
+    suffix = "_20230521_235910_1ch_HPF"
     
     if name_body.startswith(prefix) and name_body.endswith(suffix):
         return name_body[len(prefix):-len(suffix)]
@@ -66,10 +66,15 @@ def process_single_file(file_path):
     std_dev = values.std()
     sigma_3 = 3 * std_dev
     
+    # --- DEBUG START ---
+    print(f"  [DEBUG] Global 3Sigma: {sigma_3:.2f} (Range: 20-300)")
+    # --- DEBUG END ---
+
     # 判定: 3σが20以下または300以上なら無効(0)、それ以外は有効(1)
     is_valid = 1
     if sigma_3 <= 20 or sigma_3 >= 300:
         is_valid = 0
+        print("  [DEBUG] -> Global Invalid")
     
     # --- 5分割判定 (追加処理) ---
     # データを5分割して、それぞれの部分で3シグマ判定を行う
@@ -87,16 +92,22 @@ def process_single_file(file_path):
         chunk_std = chunk.std()
         chunk_sigma_3 = 3 * chunk_std
         
+        chunk_status = "Valid"
         # 判定条件はこれまでと同じ
         if chunk_sigma_3 <= 20 or chunk_sigma_3 >= 300:
             split_invalid_count += 1
+            chunk_status = "Invalid"
+        
+        # --- DEBUG START ---
+        print(f"    [DEBUG] Chunk {i}: 3Sigma={chunk_sigma_3:.2f} -> {chunk_status}")
+        # --- DEBUG END ---
             
     # 元々有効だった場合のみ、この条件で再判定を行い無効化する
     # (元々無効だったものは無効のまま)
     if is_valid == 1:
         if split_invalid_count >= 2:  # 2つ以上で無効
             is_valid = 0
-            print(f"  -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
+            print(f"  [DEBUG] -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
 
     id_name = get_id_from_filename(file_path)
     print(f"Processed: {id_name} | 3Sigma: {sigma_3:.2f} | Valid: {is_valid} | SplitInvalid: {split_invalid_count}/5")
