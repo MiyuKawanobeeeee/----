@@ -51,13 +51,25 @@ def process_single_file(file_path):
         print(f"Skipping {os.path.basename(file_path)}: Error reading file - {e}")
         return None
     
-    # 必要な列の存在確認
-    if 'value' not in df.columns or 'timestamp' not in df.columns:
-        # print(f"Skipping {os.path.basename(file_path)}: Missing required columns.")
+    
+    # 必要な列の存在確認 (lib_job7と同じ優先順位にする)
+    # 1. peak_value があればそれを使う
+    # 2. なければ value を使う
+    
+    target_col = None
+    if 'peak_value' in df.columns:
+        target_col = 'peak_value'
+    elif 'value' in df.columns:
+        target_col = 'value'
+    
+    if target_col is None or 'timestamp' not in df.columns:
+        print(f"Skipping {os.path.basename(file_path)}: Missing required columns (peak_value/value or timestamp).")
         return None
 
-    values = df['value']
+    values = df[target_col]
     timestamps = df['timestamp']
+    
+    print(f"Processing {os.path.basename(file_path)} using column: '{target_col}'")
     
     if len(values) == 0:
         return None

@@ -119,24 +119,45 @@ def is_convex_upwards(y_values):
 
 def load_csv_page3(path):
     df = pd.read_csv(path)
-    # 元の必須列を確認
-    if "peak_time" in df.columns and "peak_value" in df.columns:
-        peak_time_numeric = pd.to_numeric(df["peak_time"], errors='coerce')
-        peak_value_numeric = pd.to_numeric(df["peak_value"], errors='coerce')
-        timestamp_numeric = pd.to_numeric(df["timestamp"], errors='coerce') if "timestamp" in df.columns else pd.Series([0]*len(df))
+    
+    # 解析用データ (必須)
+    if "peak_time" not in df.columns or "peak_value" not in df.columns:
+        raise ValueError("Missing required analysis columns: peak_time, peak_value")
+
+    # 検証用データ (必須: これがないとValidationできないためエラーとするか、それともValidationだけスキップするかだが、
+    # 指示では「絶対に使用すること」とあるため、存在を必須とするのが自然)
+    if "value" not in df.columns:
+         raise ValueError("Missing required validation column: value")
+    
+    peak_time_numeric = pd.to_numeric(df["peak_time"], errors='coerce')
+    peak_value_numeric = pd.to_numeric(df["peak_value"], errors='coerce')
+    
+    # value列、timestamp列も数値化して保持
+    value_numeric = pd.to_numeric(df["value"], errors='coerce')
+    timestamp_numeric = pd.to_numeric(df["timestamp"], errors='coerce') if "timestamp" in df.columns else pd.Series([0]*len(df))
+
+    # 新しいDataFrameを作成 (混在させない)
+    # 解析用: time (<- peak_time), peak_value
+    # 検証用: value, timestamp
+    new_df = pd.DataFrame({
+        "time": peak_time_numeric,       # 解析用グループ化に使用
+        "peak_value": peak_value_numeric, # 解析用計算に使用
         
-        df = pd.DataFrame({
-            "time": peak_time_numeric,
-            "timestamp": timestamp_numeric,
-            "peak_value": peak_value_numeric,
-            "dif_time": pd.to_numeric(df["dif_time"], errors='coerce') if "dif_time" in df.columns else pd.Series([0]*len(df)),
-        })
-        df = df.dropna(subset=["time", "peak_value"]).reset_index(drop=True)
-        if df.empty: raise ValueError("No valid data.")
-        return df
-    else:
-        # フォールバックまたはエラー
-        raise ValueError("Missing required columns: peak_time, peak_value")
+        "value": value_numeric,          # 検証用(Validation)に使用
+        "timestamp": timestamp_numeric,   # 検証用などに使用
+    })
+    
+    # 解析用のデータがNaNの行は削除するが、検証用の行と数が合わなくなる可能性がある。
+    # 通常、peakデータはサンプリングデータより少ない（間引かれている）ことが多いが、
+    # 同じファイルに列として入っている場合、行ごとに対応しているのか、それとも単なる列の羅列なのか？
+    # -> CSVの構造によるが、通常は1行・1時刻・1計測値。
+    #    もしpeak_valueが特定の行にしか値が入っていない(他はNaN)タイプなら dropna すると value データも消える。
+    #    しかし「同じCSV」前提なら、行単位で有効なデータのみ残すのが定石。
+    
+    new_df = new_df.dropna(subset=["time", "peak_value", "value"]).reset_index(drop=True)
+    
+    if new_df.empty: raise ValueError("No valid data (columns exist but data is empty or NaN).")
+    return new_df
 
 def cal_peakvalue_ratio_page3(peak_values, top_n_peaks, ratios_to_calc):
     results = {f'ratio_{num}_{den}': np.nan for num, den in ratios_to_calc}
@@ -323,7 +344,8 @@ def main_process_page3(file_path, group_interval, top_n_peaks, ratios_to_calc, o
                 avg_ratio_13_1 = analysis_df['peak_13/peak_1'].mean()
             
             # Validation
-            is_valid, sigma3, split_inv = validate_peak_data(df['peak_value'], min_th=validation_min_th)
+            # 修正: Validationは必ず 'value' 列を使用する
+            is_valid, sigma3, split_inv = validate_peak_data(df['value'], min_th=validation_min_th)
 
             return {
                 "file_name": base_filename,
