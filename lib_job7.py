@@ -119,45 +119,30 @@ def is_convex_upwards(y_values):
 
 def load_csv_page3(path):
     df = pd.read_csv(path)
-    
-    # 解析用データ (必須)
-    if "peak_time" not in df.columns or "peak_value" not in df.columns:
-        raise ValueError("Missing required analysis columns: peak_time, peak_value")
-
-    # 検証用データ (必須: これがないとValidationできないためエラーとするか、それともValidationだけスキップするかだが、
-    # 指示では「絶対に使用すること」とあるため、存在を必須とするのが自然)
-    if "value" not in df.columns:
-         raise ValueError("Missing required validation column: value")
-    
-    peak_time_numeric = pd.to_numeric(df["peak_time"], errors='coerce')
-    peak_value_numeric = pd.to_numeric(df["peak_value"], errors='coerce')
-    
-    # value列、timestamp列も数値化して保持
-    value_numeric = pd.to_numeric(df["value"], errors='coerce')
-    timestamp_numeric = pd.to_numeric(df["timestamp"], errors='coerce') if "timestamp" in df.columns else pd.Series([0]*len(df))
-
-    # 新しいDataFrameを作成 (混在させない)
-    # 解析用: time (<- peak_time), peak_value
-    # 検証用: value, timestamp
-    new_df = pd.DataFrame({
-        "time": peak_time_numeric,       # 解析用グループ化に使用
-        "peak_value": peak_value_numeric, # 解析用計算に使用
+    # 元の必須列を確認
+    if "peak_time" in df.columns and "peak_value" in df.columns:
+        peak_time_numeric = pd.to_numeric(df["peak_time"], errors='coerce')
+        peak_value_numeric = pd.to_numeric(df["peak_value"], errors='coerce')
+        timestamp_numeric = pd.to_numeric(df["timestamp"], errors='coerce') if "timestamp" in df.columns else pd.Series([0]*len(df))
         
-        "value": value_numeric,          # 検証用(Validation)に使用
-        "timestamp": timestamp_numeric,   # 検証用などに使用
-    })
-    
-    # 解析用のデータがNaNの行は削除するが、検証用の行と数が合わなくなる可能性がある。
-    # 通常、peakデータはサンプリングデータより少ない（間引かれている）ことが多いが、
-    # 同じファイルに列として入っている場合、行ごとに対応しているのか、それとも単なる列の羅列なのか？
-    # -> CSVの構造によるが、通常は1行・1時刻・1計測値。
-    #    もしpeak_valueが特定の行にしか値が入っていない(他はNaN)タイプなら dropna すると value データも消える。
-    #    しかし「同じCSV」前提なら、行単位で有効なデータのみ残すのが定石。
-    
-    new_df = new_df.dropna(subset=["time", "peak_value", "value"]).reset_index(drop=True)
-    
-    if new_df.empty: raise ValueError("No valid data (columns exist but data is empty or NaN).")
-    return new_df
+        df = pd.DataFrame({
+            # Original data (req by user)
+            "org_time": pd.to_numeric(df["time"], errors='coerce') if "time" in df.columns else pd.Series([0]*len(df)),
+            "org_timestamp": pd.to_numeric(df["timestamp"], errors='coerce') if "timestamp" in df.columns else pd.Series([0]*len(df)),
+            "org_value": pd.to_numeric(df["value"], errors='coerce') if "value" in df.columns else pd.Series([0]*len(df)),
+            
+            # Peak data (used for calculation)
+            "time": peak_time_numeric,
+            "timestamp": timestamp_numeric,
+            "peak_value": peak_value_numeric,
+            "dif_time": pd.to_numeric(df["dif_time"], errors='coerce') if "dif_time" in df.columns else pd.Series([0]*len(df)),
+        })
+        df = df.dropna(subset=["time", "peak_value"]).reset_index(drop=True)
+        if df.empty: raise ValueError("No valid data.")
+        return df
+    else:
+        # フォールバックまたはエラー
+        raise ValueError("Missing required columns: peak_time, peak_value")
 
 def cal_peakvalue_ratio_page3(peak_values, top_n_peaks, ratios_to_calc):
     results = {f'ratio_{num}_{den}': np.nan for num, den in ratios_to_calc}
@@ -344,8 +329,7 @@ def main_process_page3(file_path, group_interval, top_n_peaks, ratios_to_calc, o
                 avg_ratio_13_1 = analysis_df['peak_13/peak_1'].mean()
             
             # Validation
-            # 修正: Validationは必ず 'value' 列を使用する
-            is_valid, sigma3, split_inv = validate_peak_data(df['value'], min_th=validation_min_th)
+            is_valid, sigma3, split_inv = validate_peak_data(df['org_value'], min_th=validation_min_th)
 
             return {
                 "file_name": base_filename,
@@ -564,6 +548,7 @@ class LogicPage1:
         for file_name in file_paths:
             try:
                 extracted_id = extract_id(file_name, split_idx_start, split_idx_end)
+                print(f"Page1 Processing ID: {extracted_id} (File: {os.path.basename(file_name)})")
                 df = pd.read_csv(file_name)
                 total_points = self.create_plot_data_p1(df, "freq_hz", "amplitude", file_name, interval_width, ratio_threshold, save_folder_name, max_target_peak_index, base_dir=base_output_dir)
                 summary_results.append({
@@ -729,6 +714,7 @@ class LogicPage2:
         for file_name in file_paths:
             try:
                 extracted_id = extract_id(file_name, split_idx_start, split_idx_end)
+                print(f"Page2 Processing ID: {extracted_id} (File: {os.path.basename(file_name)})")
                 df = pd.read_csv(file_name)
                 total_points, p1, p2 = self.create_plot_data_p2(df, "freq_hz", "amplitude", file_name, interval_peak, interval_sum, save_folder_name, base_dir=base_output_dir)
                 summary_results.append({
@@ -848,15 +834,16 @@ class LogicPage3:
         
         summary_results = []
         for file_path in file_paths:
+            extracted_id = extract_id(file_path, split_start, split_end)
+            print(f"Page3 Processing ID: {extracted_id} (File: {os.path.basename(file_path)})")
+            
             file_summary = main_process_page3(file_path, group_interval, top_n, ratios_to_calc, output_folder, th1, th2,
                                               use_average_center=use_avg, manual_center_idx=manual_center, center_offset=center_offset,
                                               use_global_mode=is_global, global_center_peak_idx=(global_n_t1, global_n_t2) if is_global else 0,
                                               validation_min_th=exclusion_th)
             
-
-            
             if file_summary:
-                extracted_id = extract_id(file_summary['file_name'], split_start, split_end)
+                # extracted_id is already available
                 # max_val = file_summary.get("max_peak_value", 0)
                 # valid = 1 if max_val >= exclusion_th else 0
                 valid = file_summary.get("validation_result", 0) # Use the validation logic result

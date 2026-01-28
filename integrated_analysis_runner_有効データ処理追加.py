@@ -389,7 +389,7 @@ class IntegratedRunnerApp(tk.Tk):
         
         ttk.Label(tab, text="Output Folder Name:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.t1_out = ttk.Entry(tab, width=50)
-        self.t1_out.insert(0, os.path.join(self.base_dir, "clipdata_NK04_raw"))
+        self.t1_out.insert(0, os.path.join(self.base_dir, "clipdata_NK05_raw"))
         self.t1_out.grid(row=3, column=1, padx=5, pady=5)
         
         btn_frame = ttk.Frame(tab)
@@ -470,7 +470,7 @@ class IntegratedRunnerApp(tk.Tk):
         
         ttk.Label(tab, text="Output Folder Name:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.t2_out = ttk.Entry(tab, width=50)
-        self.t2_out.insert(0, os.path.join(self.base_dir, "clipdata_NK04_HPF"))
+        self.t2_out.insert(0, os.path.join(self.base_dir, "clipdata_NK05_HPF"))
         self.t2_out.grid(row=3, column=1, padx=5, pady=5)
         
         ttk.Button(tab, text="Run Task 2", command=self.run_task2).grid(row=4, column=1, pady=20)
@@ -527,6 +527,7 @@ class IntegratedRunnerApp(tk.Tk):
         for t_file in cliptime_files:
             for d_file in data_files:
                 try:
+                    self.log(f"Processing: {os.path.basename(t_file)} & {os.path.basename(d_file)}")
                     lib_job2.main(t_file, d_file, out_folder)
                     success_count += 1
                 except Exception as e:
@@ -702,7 +703,7 @@ class IntegratedRunnerApp(tk.Tk):
 
         ttk.Label(tab, text="Output Folder Name:").grid(row=3, column=0, sticky="w", padx=5, pady=5)
         self.t4_out = ttk.Entry(tab, width=50)
-        self.t4_out.insert(0, os.path.join(self.base_dir, "時間区間比率_clipdata_NK04_HPF"))
+        self.t4_out.insert(0, os.path.join(self.base_dir, "時間区間比率_clipdata_NK05_HPF"))
         self.t4_out.grid(row=3, column=1, padx=5, pady=5)
         
         ttk.Button(tab, text="Run Task 4", command=self.run_task4).grid(row=4, column=1, pady=20)
@@ -760,6 +761,7 @@ class IntegratedRunnerApp(tk.Tk):
         for t_file in cliptime_files:
             for d_file in data_files:
                 try:
+                    self.log(f"Processing: {os.path.basename(t_file)} & {os.path.basename(d_file)}")
                     # Task 4 uses lib_job2 but targets Task 4 output
                     lib_job2.main(t_file, d_file, out_folder)
                     success_count += 1
@@ -875,7 +877,7 @@ class IntegratedRunnerApp(tk.Tk):
         
         ttk.Label(tab, text="Result Name (Prefix):").grid(row=0, column=0, sticky="w", padx=5, pady=5)
         self.t7_name = ttk.Entry(tab, width=50)
-        self.t7_name.insert(0, "NK04_カルテ時間_autothre")
+        self.t7_name.insert(0, "NK05_カルテ時間_autothre")
         self.t7_name.grid(row=0, column=1, padx=5, pady=5)
 
         # 1. Peak 2 Result Folder (Task 6 Output)
