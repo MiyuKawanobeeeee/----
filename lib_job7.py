@@ -137,8 +137,17 @@ def load_csv_page3(path):
             "peak_value": peak_value_numeric,
             "dif_time": pd.to_numeric(df["dif_time"], errors='coerce') if "dif_time" in df.columns else pd.Series([0]*len(df)),
         })
-        df = df.dropna(subset=["time", "peak_value"]).reset_index(drop=True)
-        if df.empty: raise ValueError("No valid data.")
+        
+        # 解析用のデータがNaNの行は削除するが、検証用の行と数が合わなくなる可能性がある。
+        # 通常、peakデータはサンプリングデータより少ない（間引かれている）ことが多いが、
+        # 同じファイルに列として入っている場合、行ごとに対応しているのか、それとも単なる列の羅列なのか？
+        # -> CSVの構造によるが、通常は1行・1時刻・1計測値。
+        #    しかし Validation目的のデータ(org_value)を削ると標準偏差が変わってしまうため、
+        #    ここでは dropna は行わず、解析ロジック側で必要な行だけ抽出するように変更する。
+        
+        # new_df = new_df.dropna(subset=["time", "peak_value", "value"]).reset_index(drop=True)
+        
+        if df.empty: raise ValueError("No valid data (columns exist but data is empty).")
         return df
     else:
         # フォールバックまたはエラー
@@ -288,8 +297,14 @@ def prepare_analysis_dataframe_page3(df, group_interval, top_n_peaks, ratios_to_
                                      use_average_center=False, manual_center_idx=0, center_offset=3,
                                      use_global_mode=False, global_center_peak_idx=0):
     if df.empty: return pd.DataFrame()
-    df["group"] = (df["time"] / group_interval).apply(math.ceil)
-    analysis_df = df.groupby('group').apply(
+    
+    # 解析用には peak_value, time が Valid なものだけ使う
+    analysis_source_df = df.dropna(subset=["time", "peak_value"]).copy()
+    
+    if analysis_source_df.empty: return pd.DataFrame()
+
+    analysis_source_df["group"] = (analysis_source_df["time"] / group_interval).apply(math.ceil)
+    analysis_df = analysis_source_df.groupby('group').apply(
         analyze_group_page3, 
         top_n_peaks=top_n_peaks, 
         ratios_to_calc=ratios_to_calc,
