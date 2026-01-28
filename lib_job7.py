@@ -18,7 +18,7 @@ from collections import Counter
 
 # --- 共通ヘルパー ---
 
-def validate_peak_data(values, min_th=20, max_th=300):
+def validate_peak_data(values, min_th=20, max_th=350):
     if len(values) == 0:
         return 0, 0, 0 # valid, sigma3, split_invalid
 
@@ -51,9 +51,15 @@ def validate_peak_data(values, min_th=20, max_th=300):
         # --- DEBUG END ---
             
     if is_valid == 1:
+        # 元々有効だった場合: 2つ以上無効なら無効に転落
         if split_invalid_count >= 2:
             is_valid = 0
-            print(f"  [DEBUG] -> Re-evaluated as Invalid (Split Invalid Count: {split_invalid_count}/5)")
+            print(f"  [DEBUG] -> Re-evaluated as Invalid (Too many invalid splits: {split_invalid_count}/5)")
+    else:
+        # 元々無効だった場合: 4つ以上有効(無効が1以下)なら有効に復活(救済措置)
+        if split_invalid_count <= 1:
+            is_valid = 1
+            print(f"  [DEBUG] -> Re-evaluated as Valid (Recovery: {5-split_invalid_count}/5 valid splits)")
             
     return is_valid, sigma3, split_invalid_count
 
